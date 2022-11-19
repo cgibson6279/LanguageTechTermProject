@@ -17,15 +17,8 @@
 #https://github.com/seduerr91/pawraphrase_public/blob/master/t5_pawraphrase_training.ipynb
 
 import argparse
-import glob
 import os
-import json
-import time
 import logging
-import random
-import re
-from itertools import chain
-from string import punctuation
 
 import spacy
 spacy.prefer_gpu()
@@ -38,17 +31,9 @@ nlp = English()
 # Create a blank Tokenizer with just the English vocab
 spacy_tokenizer = Tokenizer(nlp.vocab)
 
-import pandas as pd
 import pytorch_lightning as pl
-import numpy as np
-import torch
-
-from torch.utils.data import Dataset, DataLoader
-
 
 from model import LoggingCallback, FineTuneT5Model
-
-from torch_dataset import T5Dataset
 
 DATA_DIR = "data/final/"
 MODEL_NAME = "t5-small"
