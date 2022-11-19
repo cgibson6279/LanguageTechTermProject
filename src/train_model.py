@@ -44,12 +44,7 @@ import numpy as np
 import torch
 
 from torch.utils.data import Dataset, DataLoader
-from transformers import (
-    AdamW,
-    T5ForConditionalGeneration,
-    T5Tokenizer,
-    get_linear_schedule_with_warmup
-)
+
 
 from model import LoggingCallback, FineTuneT5Model
 
@@ -62,9 +57,9 @@ VAL_FILE = "val"
 TEST_FILE = "test"
 FILE_TYPE = ".tsv"
 
-OUTPUT_DIR = "src/dfcx_scrapi/core_ml/cpk"
+OUTPUT_DIR = "cpk/"
 FILE_TYPE = ".tsv"
-MODEL_SAVE_PATH = "src/dfcx_scrapi/core_ml/t5_small_paraphrase/"
+MODEL_SAVE_PATH = "t5_small_paraphrase/"
 
 #!pip install torch==1.4.0 -q
 #!pip install transformers==2.9.0 -q
@@ -124,7 +119,7 @@ def main(args: argparse.Namespace) -> None:
         model.model.save_pretrained(MODEL_SAVE_PATH)
     except AssertionError:
         try:
-            model.model.save_pretrained('./t5_small_paraphrase/')
+            model.model.save_pretrained(MODEL_SAVE_PATH)
         except AssertionError:
             model.model.save_pretrained(os.getcwd())
     print('Saved model...')
@@ -133,7 +128,7 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("data_dir", help="", nargs='?', type=str, const="data/final/", default="data/final/")
-    parser.add_argument("output_dir", help="", nargs='?', type=str, const="src/dfcx_scrapi/core_ml/cpk", default="src/dfcx_scrapi/core_ml/cpk")
+    parser.add_argument("output_dir", help="", nargs='?', type=str, const="cpk/", default="cpk/")
     parser.add_argument("model_name_or_path", help="", nargs='?', type=str, const="t5-small", default="t5-small")
     parser.add_argument("tokenizer_name_or_path", help="Debug", nargs='?', type=str, const="t5-small", default="t5-small")
     #parser.add_argument("max_seq_length", help="", nargs='?', type=int, const=512, default=512)

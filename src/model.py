@@ -43,7 +43,7 @@ import pytorch_lightning as pl
 import numpy as np
 import torch
 #import torch_xla.core.xla_model as xm 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from transformers import (
     AdamW,
     T5ForConditionalGeneration,

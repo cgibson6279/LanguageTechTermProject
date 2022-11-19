@@ -20,23 +20,8 @@ import logging
 
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
-
-from transformers import T5Tokenizer
-
-import google.auth
-import gspread
-from gspread_dataframe import set_with_dataframe
-from oauth2client.service_account import ServiceAccountCredentials
-
-from google.cloud.dialogflowcx_v3beta1 import types
 
 from typing import Dict, List
-
-GLOBAL_SCOPE = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
 
 # logging config
 logging.basicConfig(
@@ -55,7 +40,6 @@ class T5Dataset(torch.utils.data.Dataset):
         tokenizer = None, 
         data_dir: str = None,  
         truncation: bool= True,
-        padding: str = None,
         return_tensors: str = None
         ) -> None:
 
