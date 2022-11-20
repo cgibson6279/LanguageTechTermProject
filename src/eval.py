@@ -27,25 +27,21 @@ import re
 from itertools import chain
 from string import punctuation
 
+# Create a blank Tokenizer with just the English vocab
+# import language_tool_python
+import pandas as pd
+import pylev
+import pytorch_lightning as pl
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 import spacy
 spacy.prefer_gpu()
 nlp = spacy.load("en_core_web_sm")
-
-# Construction 1
 from spacy.tokenizer import Tokenizer
+spacy_tokenizer = Tokenizer(nlp.vocab)
 from spacy.lang.en import English
 nlp = English()
-# Create a blank Tokenizer with just the English vocab
-spacy_tokenizer = Tokenizer(nlp.vocab)
-
-import pandas as pd
-import pytorch_lightning as pl
-import numpy as np
 import torch
-# print(torch.backends.mps.is_available())
-# print(torch.backends.mps.is_built()) # run if running on Mac OS
-# print(torch.cuda.device_count()) # run if running on Mac OS
-
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
     AdamW,
@@ -54,57 +50,108 @@ from transformers import (
     get_linear_schedule_with_warmup
 )
 from model import LoggingCallback, FineTuneT5Model
-
 from torch_dataset import T5Dataset
+from typing import List, Dict
 
-MODEL_PATH = "../t5_small_paraphrase/"
-CONFIG_PATH = "../t5_small_paraphrase/config.json"
+MODEL_PATH = "t5_small_paraphrase/"
+CONFIG_PATH = "t5_small_paraphrase/config.json"
+
+def get_avg_levenstein_distance(src_txt:  str, paraphrased_txt: str) -> float:
+    """Returns levenschtein distance at word level between src_text and paraphrase"""
+    return pylev.levenschtein(src_txt.split(), paraphrased_txt.split())
+
+
+def get_avg_similarity(src_txt: str, paraphrased_txt: str, tokenizer) -> float:
+    """Returns cosine similarity between source and paraphrase sentence vectors"""
+    src_txt_encoded = tokenizer.encode_plus(src_txt, pad_to_max_length=True, return_tensors="pt")
+    paraphrased_txt_encoded = tokenizer.encode_plus(paraphrased_txt, pad_to_max_length=True, return_tensors="pt")
+    return torch.nn.functional.cosine_similarity(src_txt_encoded["input_ids"].float(), paraphrased_txt_encoded["input_ids"].float())
+
+
+def get_num_grammatical_errors(paraphrased_txt: str, model) -> float:
+    """Returns the number of errors calculated by LanguageTool"""
+    return len(tool.check(paraphrased_txt))
+
 
 def main(args: argparse.Namespace) -> None:
     
+    # sen_model = SentenceTransformer('paraphrase-MiniLM-L3-v2').to(device)
+    # tool = language_tool_python.LanguageTool('en-US')
+
     model = T5ForConditionalGeneration.from_pretrained(MODEL_PATH)
     tokenizer = T5Tokenizer.from_pretrained("t5-small")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print ("device ",device)
     model = model.to(device)
-
-    sentence = "Can you confirm no data charge?"
+    
+    levenstein_distances = []
+    cos_similaries = []
+    num_grammatical_errors = []
+    
+    # sentence = "Can you confirm no data charge?"
     # sentence = "What are the ingredients required to bake a perfect cake?"
     # sentence = "What is the best possible approach to learn aeronautical engineering?"
     # sentence = "Do apples taste better than oranges in general?"
+    sentences = [
+        "billing and missing a credit", 
+        "where's my credit",
+        "I'm missing a credit", 
+        "credit not applied",
+        "missing credit",
+        "missing device credit"
+        "check into payment not credited",
+        "credit charge off",
+        "credit not received",
+        "I was offered a credit on my account"
+    ]
+    for sentence in sentences:
+        text =  "paraphrase: " + sentence + " </s>"
+        max_len = 256
+        encoding = tokenizer.encode_plus(text,pad_to_max_length=True, return_tensors="pt")
+        input_ids, attention_masks = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
 
-    text =  "paraphrase: " + sentence + " </s>"
+        # set top_k = 50 and set top_p = 0.95 and num_return_sequences = 3
+        beam_outputs = model.generate(
+            input_ids=input_ids, attention_mask=attention_masks,
+            do_sample=True,
+            max_length=256,
+            top_k=120,
+            top_p=0.98,
+            early_stopping=True,
+            temperature = 0.8,
+            num_return_sequences=10
+        )
 
-    max_len = 256
+        print ("\nOriginal Question ::")
+        print (sentence)
+        print ("\n")
+        print ("Paraphrased Questions :: ")
+        final_outputs =[]
+        for beam_output in beam_outputs:
+            paraphrase = tokenizer.decode(beam_output, skip_special_tokens=True,clean_up_tokenization_spaces=True)
+            if paraphrase.lower() != sentence.lower() and paraphrase not in final_outputs:
+                
+                levenstein_distance = get_avg_levenstein_distance(sentence, paraphrase)
+                cos_similarity = get_avg_similarity(sentence, paraphrase, tokenizer = tokenizer)
+                # num_grammatical_errors = get_num_grammatical_errors(sentence, paraphase)
+                
+                levenstein_distances.append(levenstein_distance)
+                cos_similaries.append(cos_similarity)
+                # num_grammatical_errors.append(num_grammatical_errors)
+                
+                final_outputs.append(paraphrase)
 
-    encoding = tokenizer.encode_plus(text,pad_to_max_length=True, return_tensors="pt")
-    input_ids, attention_masks = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
-
-    # set top_k = 50 and set top_p = 0.95 and num_return_sequences = 3
-    beam_outputs = model.generate(
-        input_ids=input_ids, attention_mask=attention_masks,
-        do_sample=True,
-        max_length=256,
-        top_k=120,
-        top_p=0.98,
-        early_stopping=True,
-        temperature = 0.8,
-        num_return_sequences=10
-    )
-
-    print ("\nOriginal Question ::")
-    print (sentence)
-    print ("\n")
-    print ("Paraphrased Questions :: ")
-    final_outputs =[]
-    for beam_output in beam_outputs:
-        sent = tokenizer.decode(beam_output, skip_special_tokens=True,clean_up_tokenization_spaces=True)
-        if sent.lower() != sentence.lower() and sent not in final_outputs:
-            final_outputs.append(sent)
-
-    for i, final_output in enumerate(final_outputs):
-        print("{}: {}".format(i, final_output))
+        for i, final_output in enumerate(final_outputs):
+            print("{}: {}".format(i, final_output))
+            
+    avg_levenschtein_distance = sum(levenstein_distances)/ len(levenstein_distances)
+    avg_cos_similarity = sum(cos_similaries) / len(cos_similaries)
+    # avg_num_grammatical_error = round(sum(num_grammatical_errors) / len(num_grammatical_errors),2)
+        
+    print(f"Avg levenschtein distance: {avg_levenschtein_distance}")
+    print(f"Avg cos similarity: {avg_cos_similarity}")
+    # print(f"Avg number of grammatical errors: {avg_num_grammatical_error}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(__doc__)

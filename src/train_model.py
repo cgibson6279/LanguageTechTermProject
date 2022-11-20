@@ -125,7 +125,7 @@ if __name__ == "__main__":
     parser.add_argument("eval_batch_size", help="", nargs='?', type=int, const=4, default=4)
     parser.add_argument("num_train_epochs", help="Debug", nargs='?', type=int, const=10, default=10)
     parser.add_argument("gradient_accumulation_steps", help="", nargs='?', type=int, const=16, default=16)
-    parser.add_argument("n_gpu", help="", nargs='?', type=int, const=0, default=0)
+    parser.add_argument("n_gpu", help="", nargs='?', type=int, const=1, default=1)
     parser.add_argument("early_stop_callback", help="", nargs='?', type=bool, const=False, default=False)
     parser.add_argument("fp_16", help="Debug", nargs='?', type=bool, const=False, default=False)
     parser.add_argument("opt_level", help="", nargs='?', type=str, const='O1', default='O1')
